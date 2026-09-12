@@ -214,7 +214,9 @@ namespace FindYou
                                 channel.send(buffer, 0, count); window += count;
                             }
                             await Rpc("flush", new Dictionary<string, object> { { "offset", offset }, { "length", window } }, cancel);
-                            offset += window; NativeWorkspace.Progress(send, window, clock);
+                            offset += window; NativeWorkspace.Progress(send, window);
+                            // P2P acknowledges whole windows, so retain the average between acknowledgements.
+                            send.History.TransferRate = (long)(send.Done / Math.Max(.001, clock.Elapsed.TotalSeconds));
                         }
                     }
                     await Rpc("endEntry", new Dictionary<string, object>(), cancel);

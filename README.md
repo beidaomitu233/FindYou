@@ -14,7 +14,7 @@ FindYou 是面向 Windows 的双向文件互传工具。启动后自动发现设
 
 ## 更新与移动
 
-设置 → 软件更新 → 检查更新。新版本来自公开 GitHub Releases，点击下载后在应用内显示进度，并校验发布附件中的 SHA-256。下载完成后打开文件位置，待传输完成、从托盘退出，再替换原程序。更新失败可重新检查或下载。当前版本为 5.1.0，不会自动安装或中断传输。
+设置 → 软件更新 → 检查更新。新版本来自公开 GitHub Releases，点击下载后在应用内显示进度，并校验发布附件中的 SHA-256。下载完成后打开文件位置，待传输完成、从托盘退出，再替换原程序。更新失败可重新检查或下载。当前源码版本为 5.1.2，公开发布版仍为 5.1.0；应用不会自动安装或中断传输。
 
 后续版本修改 `FindYou.Update.cs` 中的版本号和程序集版本，运行构建、验收和签名流程后创建 `v主.次.修订` Tag。GitHub Release 必须包含 `FindYou.exe` 和 `FindYou.exe.sha256`（仅 64 位十六进制哈希），并附带依赖许可文件；使用草稿上传齐全后再公开，不将预发布版本推送给客户端。
 
@@ -49,6 +49,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 | `FindYou.cs` | Windows 入口、托盘、配置、发现和 HTTP 服务 |
 | `FindYou.Window.cs` / `FindYou.Native.xaml` | 原生 WPF 界面和雷达动效 |
 | `FindYou.Native.cs` | 原生会话、发送队列和 HTTP 流式发送 |
+| `FindYou.Speed.cs` | HTTP 传输中的近期速度采样 |
 | `FindYou.Rtc.cs` | ICE、DTLS、SCTP DataChannel 直连 |
 | `FindYou.Workspace.cs` / `FindYou.Direct.cs` | 接收批次、授权、落盘和异常清理 |
 | `findyou-relay.js` / `relay.html` | 可选的跨网络发现与信令服务 |

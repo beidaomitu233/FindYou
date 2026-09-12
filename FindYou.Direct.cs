@@ -32,11 +32,13 @@ namespace FindYou
                         || Num(args, "offset", -1) != batch.FileDone || length != batch.FileSize - batch.FileDone
                         || (prefix != null && prefix.Length > length)) throw new Exception("文件流与接收清单不一致");
                     byte[] buffer = new byte[128 * 1024];
+                    if (batch.History != null) batch.History.RecentSpeed = true;
                     long remaining = length;
                     if (prefix != null && prefix.Length > 0)
                     {
                         batch.Stream.Write(prefix, 0, prefix.Length);
                         batch.FileDone += prefix.Length; batch.Done += prefix.Length; remaining -= prefix.Length;
+                        if (batch.History != null) batch.History.Speed.Add(prefix.Length);
                     }
                     while (remaining > 0)
                     {
@@ -45,7 +47,7 @@ namespace FindYou
                         if (count == 0) throw new IOException("传输连接中断");
                         batch.Stream.Write(buffer, 0, count);
                         batch.FileDone += count; batch.Done += count; remaining -= count; batch.Last = DateTime.UtcNow;
-                        if (batch.History != null) { batch.History.Progress = batch.Total == 0 ? 0 : (int)Math.Min(99, batch.Done * 100 / batch.Total); batch.History.TransferRate = (long)(batch.Done / Math.Max(.001, batch.Clock.Elapsed.TotalSeconds)); }
+                        if (batch.History != null) { batch.History.Progress = batch.Total == 0 ? 0 : (int)Math.Min(99, batch.Done * 100 / batch.Total); batch.History.Speed.Add(count); }
                     }
                 }
                 WriteJson(stream, 200, Json.D("ok", true));

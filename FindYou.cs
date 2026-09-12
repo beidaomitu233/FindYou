@@ -657,6 +657,11 @@ namespace FindYou
         public string Peer = "";
         public long Size;
         public long TransferRate;
+        [System.Web.Script.Serialization.ScriptIgnore]
+        public readonly TransferSpeed Speed = new TransferSpeed();
+        public bool RecentSpeed;
+        [System.Web.Script.Serialization.ScriptIgnore]
+        public long LiveRate { get { return RecentSpeed ? Speed.BytesPerSecond : TransferRate; } }
         public long TimeFile = DateTime.Now.ToFileTime();
         public string Status = "";
         public int Progress = -1;
@@ -1042,6 +1047,10 @@ namespace FindYou
         {
             HttpWebRequest r = (HttpWebRequest)WebRequest.Create(url);
             r.Proxy = null;                       // 直连，不走系统代理
+            // Configure the pool before discovery creates its first connection.
+            r.ServicePoint.Expect100Continue = false;
+            r.ServicePoint.UseNagleAlgorithm = false;
+            r.KeepAlive = true;
             r.Timeout = 4000;
             r.ReadWriteTimeout = 15000;
             r.UserAgent = "FindYou/5";

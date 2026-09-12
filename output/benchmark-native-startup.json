@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-12T06:03:53.475Z",
+  "mode": "native-http-stream",
+  "bytes": 16777216,
+  "seconds": 0.127,
+  "MiBps": 125.92,
+  "environment": "same-host loopback, SHA-256 verified"
+}

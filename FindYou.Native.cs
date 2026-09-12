@@ -44,7 +44,8 @@ namespace FindYou
         public NativeSession Session;
         public string Source;
         public bool IsDir;
-        public long Done, Rate;
+        public long Done;
+        public long Rate { get { return History.Progress >= 0 && History.Progress < 100 ? History.LiveRate : 0; } }
         public long ReadTicks, WriteTicks, SaveMs, ElapsedMs;
         public CancellationTokenSource Cancel = new CancellationTokenSource();
         public HttpWebRequest Request;
@@ -216,6 +217,7 @@ namespace FindYou
                 sends.Add(send);
             }
             History.Add(send.History);
+            send.History.RecentSpeed = session.Rtc == null;
             send.Completion = Task.Run(() => RunSend(send)); Refresh(); return send;
         }
         public void Cancel(string id)
@@ -248,13 +250,12 @@ namespace FindYou
                 {
                     var result = await Control(send, "begin", new Dictionary<string, string> { { "name", send.History.Name }, { "size", send.History.Size.ToString() }, { "count", files.Count.ToString() }, { "isDir", send.IsDir ? "1" : "0" } });
                     remoteId = NativeJson.Get(result, "id");
-                    var clock = Stopwatch.StartNew();
                     foreach (var file in files)
                     {
                         token.ThrowIfCancellationRequested();
                         await Control(send, "entry", new Dictionary<string, string> { { "id", remoteId }, { "path", file.Relative }, { "size", file.Size.ToString() }, { "isDir", file.IsDir ? "1" : "0" } });
                         if (file.IsDir) continue;
-                        await Task.Run(() => Upload(send, file, remoteId, clock));
+                        await Task.Run(() => Upload(send, file, remoteId));
                         long saveStart = Stopwatch.GetTimestamp();
                         await Control(send, "end-entry", new Dictionary<string, string> { { "id", remoteId } });
                         send.SaveMs += (Stopwatch.GetTimestamp() - saveStart) * 1000 / Stopwatch.Frequency;
@@ -276,7 +277,7 @@ namespace FindYou
                 send.History.Progress = -1; send.History.Status = send.Cancel.IsCancellationRequested ? "已取消" : "失败: " + ex.Message;
                 if (remoteId != null) try { Control(send, "abort", new Dictionary<string, string> { { "id", remoteId } }, true).GetAwaiter().GetResult(); } catch { }
             }
-            finally { send.Request = null; send.Rate = 0; if (acquired) send.Session.SendGate.Release(); send.Session = null; History.Touch(send.History); Refresh(); }
+            finally { send.Request = null; if (acquired) send.Session.SendGate.Release(); send.Session = null; History.Touch(send.History); Refresh(); }
         }
         internal static HttpWebRequest Request(string url, long length)
         {
@@ -297,7 +298,7 @@ namespace FindYou
             using (var response = await request.GetResponseAsync())
             using (var reader = new StreamReader(response.GetResponseStream())) return NativeJson.Checked(await reader.ReadToEndAsync());
         }
-        void Upload(NativeSend send, NativeFile file, string id, Stopwatch clock)
+        void Upload(NativeSend send, NativeFile file, string id)
         {
             HttpFileServer.CheckNativePath(file.Full, file.Relative);
             var info = new FileInfo(file.Full);
@@ -321,7 +322,7 @@ namespace FindYou
                             long writeStart = Stopwatch.GetTimestamp();
                             output.Write(buffer, 0, count);
                             send.WriteTicks += Stopwatch.GetTimestamp() - writeStart;
-                            offset += count; Progress(send, count, clock);
+                            offset += count; Progress(send, count);
                         }
                     }
                     using (var response = request.GetResponse()) using (var reader = new StreamReader(response.GetResponseStream())) NativeJson.Checked(reader.ReadToEnd());
@@ -336,14 +337,14 @@ namespace FindYou
                         var request = Request(send.Session.Url + "/api/transfer/chunk?id=" + id + "&offset=" + offset, count); send.Request = request; request.ContentType = "application/octet-stream";
                         using (var output = request.GetRequestStream()) output.Write(buffer, 0, count);
                         using (var response = request.GetResponse()) using (var reader = new StreamReader(response.GetResponseStream())) NativeJson.Checked(reader.ReadToEnd());
-                        offset += count; Progress(send, count, clock);
+                        offset += count; Progress(send, count);
                     }
                 }
             }
         }
-        internal static void Progress(NativeSend send, int count, Stopwatch clock)
+        internal static void Progress(NativeSend send, int count)
         {
-            send.Done += count; send.Rate = (long)(send.Done / Math.Max(.001, clock.Elapsed.TotalSeconds));
+            send.Done += count; if (send.History.RecentSpeed) send.History.Speed.Add(count);
             send.History.Progress = send.History.Size == 0 ? 0 : (int)Math.Min(99, send.Done * 100 / send.History.Size);
         }
         public object State()

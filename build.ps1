@@ -30,6 +30,6 @@ foreach ($package in Get-ChildItem -LiteralPath $packagesDir -Directory) {
 $netstandard = Get-ChildItem -LiteralPath (Join-Path $env:WINDIR 'Microsoft.NET\assembly\GAC_MSIL\netstandard') -Recurse -Filter netstandard.dll | Select-Object -First 1
 if (!$netstandard) { throw '.NET Framework 4.8 is required.' }
 $references += "/r:$($netstandard.FullName)"
-& $compilerPath /nologo /target:winexe /optimize+ /platform:x64 "/out:$OutputPath" $references $resources FindYou.cs FindYou.Workspace.cs FindYou.Direct.cs FindYou.Native.cs FindYou.Rtc.cs FindYou.Window.cs FindYou.Update.cs
+& $compilerPath /nologo /target:winexe /optimize+ /platform:x64 "/out:$OutputPath" $references $resources FindYou.cs FindYou.Workspace.cs FindYou.Direct.cs FindYou.Native.cs FindYou.Rtc.cs FindYou.Window.cs FindYou.Update.cs FindYou.Speed.cs
 if ($LASTEXITCODE -ne 0) { throw 'FindYou build failed' }
 Write-Output "Built $OutputPath (native WPF UI and managed P2P; no browser runtime)"

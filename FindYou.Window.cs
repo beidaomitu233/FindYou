@@ -254,7 +254,8 @@ namespace FindYou
             if (history) rows = rows.Where(x => (historyFilter < 0 || x.Type == historyFilter) && (x.Name + " " + x.Peer).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
             else rows = session == null ? rows.Take(0) : rows.Where(x => x.Peer == session.Peer.Name && x.Time >= session.Started.AddSeconds(-1));
             var items = rows.Take(200).ToList();
-            string signature = view + string.Join("|", items.Select(x => x.Id + x.Status + x.Progress + x.Size + x.LocalPath)) + string.Join("|", sends.Select(x => x.Rate / 1048576));
+            var rates = items.ToDictionary(x => x.Id, x => x.Progress >= 0 && x.Progress < 100 ? x.LiveRate : 0);
+            string signature = view + string.Join("|", items.Select(x => x.Id + x.Status + x.Progress + x.Size + x.LocalPath + ":" + rates[x.Id] / 104858));
             if (signature == lastRows) return; lastRows = signature;
             var list = El<StackPanel>(history ? "HistoryRows" : "TransferRows"); list.Children.Clear();
             if (!history) El<TextBlock>("TransferCount").Text = items.Count == 0 ? "" : items.Count + " 项";
@@ -268,8 +269,9 @@ namespace FindYou
                 var status = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; status.Children.Add(TextNode(item.Status, 12, item.Progress < 0 ? "#FF928E" : color));
                 if (item.Progress >= 0 && item.Progress < 100)
                 {
-                    long rate = send != null ? send.Rate : item.TransferRate;
+                    long rate = rates[item.Id];
                     var details = TextNode(item.Progress + "%" + (rate > 0 ? " · " + Bytes(rate) + "/s" : ""), 11, "#919B9F"); details.Margin = new Thickness(0, 6, 0, 0); status.Children.Add(details);
+                    details.ToolTip = item.RecentSpeed ? "最近约 1 秒的传输速度" : "已确认数据的累计平均速度";
                     status.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100, Value = item.Progress, Height = 2, Margin = new Thickness(0, 7, 16, 0), Foreground = B(color), Background = B("#2A3034"), BorderThickness = new Thickness(0) });
                 }
                 else if (item.Progress == 100 && send != null && item.TransferRate > 0)

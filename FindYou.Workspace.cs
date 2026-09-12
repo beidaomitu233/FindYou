@@ -288,7 +288,7 @@ namespace FindYou
                     Directory.Delete(b.Root);
                     b.Finished = true;
                     if (b.Mode == "share") { string err = AddSharePath(b.Final); if (err != null) throw new Exception(err); }
-                    if (b.History != null) { b.History.LocalPath = b.Final; b.History.Progress = 100; b.History.Status = "已完成"; hist.Touch(b.History); }
+                    if (b.History != null) { b.History.TransferRate = (long)(b.Done / Math.Max(.001, b.Clock.Elapsed.TotalSeconds)); b.History.LocalPath = b.Final; b.History.Progress = 100; b.History.Status = "已完成"; hist.Touch(b.History); }
                     lock (workspaceGate) batches.Remove(b.Id);
                     if (b.Mode == "receive" && balloonSink != null) balloonSink("文件已收到", b.Name + " ← " + b.Peer);
                     return Json.D("ok", true, "path", b.Final);
