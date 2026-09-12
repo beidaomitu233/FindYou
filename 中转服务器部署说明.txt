@@ -1,0 +1,73 @@
+﻿FindYou 5 · 发现服务器与 HTML 连接观察台
+
+服务器仅处理发现和连接信令，文件由原生 HTTP 或 WebRTC P2P 直传。
+没有文件中继、文件存储或 TURN 回退。旧 /relay/* 请求返回 410。
+
+一、部署文件
+把以下两个文件放在同一目录：
+  findyou-relay.js
+  relay.html
+安装受支持的 Node.js，然后运行：
+  node findyou-relay.js
+默认监听 0.0.0.0:8377。
+Windows 可双击“启动中转服务器.bat”。
+
+Linux 示例：
+  cd /opt/findyou
+  HOST=127.0.0.1 PORT=8377 ADMIN_PASSWORD='替换成你的面板密码' node findyou-relay.js
+
+环境变量：
+  PORT             端口，默认 8377
+  HOST             监听地址，默认 0.0.0.0
+  ADMIN_PASSWORD   可选的面板密码，用户名固定为 admin
+
+面板密码仅保护首页和 /api/status，不影响客户端发现连接。
+直接访问 http://服务器IP:8377 即可看到 HTML 面板。
+面板包括在线设备、连接请求、P2P 成功/失败上报、信令流量和最近 200 条事件。
+P2P 状态由客户端上报，成功/失败是设备上报次数，双方会分别上报。
+服务器重启后监控计数清零。
+
+二、作为 HTTPS 网站发布
+建议使用现有 Nginx/Caddy 反向代理，并配置自己的域名与证书。
+Nginx 的 location 配置示例：
+
+  location / {
+      proxy_pass http://127.0.0.1:8377;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_buffering off;
+      proxy_read_timeout 3600s;
+  }
+
+SSE 长连接要求关闭响应缓冲。
+浏览器访问 https://你的域名 打开观察台；客户端也填写这个 HTTPS 地址。
+在反向代理下，请双方明确设置相同配对码，避免所有客户端按代理出口 IP 被归到一起。
+使用进程管理器或 systemd 维持 Node 服务运行。
+
+三、客户端
+双方升级 FindYou 5，在“偏好设置 → 跨网络发现”填写：
+  发现服务器地址：https://你的域名
+  配对码：双方一致的自定义码
+保存后自动重新发现，点击对方连接即可。
+同一局域网可以不部署服务器。
+
+四、为什么不能只有一个静态 HTML
+HTML 是观察台界面。维护在线设备、长连接和转发信令需要持续运行的后端。
+GitHub Pages 等纯静态托管只能放页面，不能直接运行本服务器。
+本项目已经提供 HTML + 零 npm 依赖 Node 后端，可以部署成网站。
+
+五、连接失败
+发现双方仅表示信令可达，不保证网络允许 P2P。
+局域网优先使用原生 HTTP；不可达时通过 STUN 尝试 WebRTC，失败后再检查 HTTP 回退。
+严格 NAT、UDP 被阻断或 AP 隔离时，两种直连仍可能均不可达。
+可切换到同一局域网或检查本机防火墙/VPN，不会占用服务器带宽中继文件。
+
+六、维护接口
+  GET /health       服务存活与 signalling-only 模式
+  GET /api/status   面板使用的状态 JSON（如配置了密码，则要求 Basic Auth）
+  GET /hub          客户端 SSE 发现连接
+  POST /signal      仅连接/发现信令，最多 64 KiB，要求在线客户端身份令牌
+  POST /relay/*     已禁用，HTTP 410
+
+不要记录 /hub 的完整查询参数，它包含临时客户端身份令牌。
+发现服务不需要接触客户端文件。公网部署请配置 HTTPS 和面板密码。

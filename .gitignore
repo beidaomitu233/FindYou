@@ -1,0 +1,13 @@
+*.exe
+*.dll
+*.pdb
+*.pfx
+*.p12
+*.key
+*.log
+config.txt
+output/*
+!output/*.cjs
+!output/*.ps1
+!output/benchmark-*.json
+.vs/
