@@ -263,7 +263,8 @@ namespace FindYou
                         b.FileSize = Num(p, "size", -1); b.FileDone = 0;
                         if (b.FileSize < 0 || b.FileSize > b.Total - b.Done) throw new Exception("文件大小不一致");
                         Directory.CreateDirectory(Path.GetDirectoryName(full));
-                        b.Stream = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        // Network reads can be only a few KB; coalesce them before writing to disk.
+                        b.Stream = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.SequentialScan);
                     }
                     b.Entries++;
                 }

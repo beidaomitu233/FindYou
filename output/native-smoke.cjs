@@ -1,5 +1,6 @@
 const fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process'),crypto=require('crypto'),assert=require('assert');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'findyou-native-')),exe=path.resolve(process.argv[2]||'FindYou.exe'),urls={},procs=[];
+const peerExe=process.env.FINDYOU_PEER_EXE?path.resolve(process.env.FINDYOU_PEER_EXE):exe;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const showUi=process.argv.includes('--ui');
 async function until(fn,message,timeout=30000){const start=Date.now();while(Date.now()-start<timeout){try{const x=await fn();if(x)return x;}catch{}await wait(100);}throw new Error(message);}
@@ -9,14 +10,14 @@ const hash=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex
 async function send(n,p){return api(n,'/api/local/native/send',{path:p});}
 async function done(n,id){return until(async()=>{const s=(await state(n)).sends.find(s=>s.id===id);if(s?.progress<0)throw new Error(s.status);return s?.progress===100;},'Transfer did not finish: '+n,120000);}
 (async()=>{try{
- for(const [n,port] of [['a',54318],['b',54328]]){const d=path.join(root,n),token=n.repeat(32);fs.mkdirSync(d);fs.writeFileSync(path.join(d,'config.txt'),'FindYouConfig2\nid='+n.repeat(32)+'\nname='+encodeURIComponent(n==='a'?'我的电脑':'设计工作站')+'\ncloud=0\nrelay=\nfw=1\ndl='+encodeURIComponent(path.join(d,'received')));procs.push(cp.spawn(exe,[...(showUi&&n==='a'?[]:['/noui']),'/data='+d,'/port='+port,'/udp='+(port+1),'/apitoken='+token],{windowsHide:!(showUi&&n==='a'),stdio:'ignore'}));urls[n]=await until(()=>{const m=fs.readFileSync(path.join(d,'findyou.log'),'utf8').match(/本机控制服务 (http:\/\/[^\r\n]+)/);if(!m)return null;const u=new URL(m[1]);u.searchParams.set('k',token);return u;},'Service missing');}
+ for(const [n,port] of [['a',54318],['b',54328]]){const d=path.join(root,n),token=n.repeat(32);fs.mkdirSync(d);fs.writeFileSync(path.join(d,'config.txt'),'FindYouConfig2\nid='+n.repeat(32)+'\nname='+encodeURIComponent(n==='a'?'我的电脑':'设计工作站')+'\ncloud=0\nrelay=\nfw=1\ndl='+encodeURIComponent(path.join(d,'received')));procs.push(cp.spawn(n==='b'?peerExe:exe,[...(showUi&&n==='a'?[]:['/noui']),'/data='+d,'/port='+port,'/udp='+(port+1),'/apitoken='+token],{windowsHide:!(showUi&&n==='a'),stdio:'ignore'}));urls[n]=await until(()=>{const m=fs.readFileSync(path.join(d,'findyou.log'),'utf8').match(/本机控制服务 (http:\/\/[^\r\n]+)/);if(!m)return null;const u=new URL(m[1]);u.searchParams.set('k',token);return u;},'Service missing');}
  await api('a','/api/local/peers/add',{host:urls.b.host});await api('b','/api/local/peers/add',{host:urls.a.host});
  await api('a','/api/local/native/connect',{peerId:'b'.repeat(32)});await until(async()=>(await state('b')).connected,'Peer did not enter session');
  const source=path.join(root,'项目资料');fs.mkdirSync(path.join(source,'空目录'),{recursive:true});fs.writeFileSync(path.join(source,'中文.txt'),'双向传输');fs.writeFileSync(path.join(source,'空文件.txt'),'');
  const file=path.join(root,'benchmark.bin'),bytes=16*1024*1024;fs.writeFileSync(file,crypto.randomBytes(bytes));
  let start=performance.now();const job=await send('a',file);await done('a',job.id);let seconds=(performance.now()-start)/1000;assert.equal(hash(file),hash(path.join(root,'b','received','benchmark.bin')));
  const result={date:new Date().toISOString(),mode:'native-http-stream',bytes,seconds:+seconds.toFixed(3),MiBps:+(bytes/1048576/seconds).toFixed(2),environment:'same-host loopback, SHA-256 verified'};
- fs.writeFileSync(path.resolve('output/benchmark-native.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ fs.writeFileSync(path.resolve(process.env.FINDYOU_BENCHMARK_OUTPUT||'output/benchmark-native.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  const outgoing=await Promise.all([send('a',source),send('b',file)]);await Promise.all([done('a',outgoing[0].id),done('b',outgoing[1].id)]);
  assert.equal(hash(path.join(source,'中文.txt')),hash(path.join(root,'b','received','项目资料','中文.txt')));assert(fs.statSync(path.join(root,'b','received','项目资料','空目录')).isDirectory());assert.equal(fs.statSync(path.join(root,'b','received','项目资料','空文件.txt')).size,0);assert.equal(hash(file),hash(path.join(root,'a','received','benchmark.bin')));console.log('PASS HTTP full-duplex file/folder, empty entries and Chinese path integrity');
  await api('a','/api/local/native/disconnect',{});await until(async()=>!(await state('b')).connected,'Disconnect not propagated');

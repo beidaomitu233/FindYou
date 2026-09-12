@@ -6,8 +6,8 @@ using System.Security.Cryptography;
 using System.Web.Script.Serialization;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-[assembly: AssemblyVersion("5.1.0.0")]
-[assembly: AssemblyFileVersion("5.1.0.0")]
+[assembly: AssemblyVersion("5.1.1.0")]
+[assembly: AssemblyFileVersion("5.1.1.0")]
 [assembly: AssemblyProduct("FindYou")]
 namespace FindYou
 {
@@ -15,7 +15,7 @@ namespace FindYou
     static class AppUpdate
     {
         public const string Repository = "beidaomitu233/FindYou";
-        public static readonly Version Current = new Version(5,1,0);
+        public static readonly Version Current = new Version(5,1,1);
         internal static UpdateRelease Parse(string json)
         {
             var data = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);

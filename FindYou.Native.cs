@@ -45,6 +45,7 @@ namespace FindYou
         public string Source;
         public bool IsDir;
         public long Done, Rate;
+        public long ReadTicks, WriteTicks, SaveMs, ElapsedMs;
         public CancellationTokenSource Cancel = new CancellationTokenSource();
         public HttpWebRequest Request;
         public Task Completion;
@@ -235,9 +236,11 @@ namespace FindYou
         async Task RunSend(NativeSend send)
         {
             string remoteId = null; bool acquired = false; var token = send.Cancel.Token;
+            Stopwatch totalClock = null;
             try
             {
                 await send.Session.SendGate.WaitAsync(token); acquired = true;
+                totalClock = Stopwatch.StartNew();
                 var files = new List<NativeFile>(); Walk(send.Source, send.History.Name, files, token);
                 send.History.Size = files.Sum(f => f.Size); send.History.Status = "发送中";
                 if (send.Session.Rtc != null) { await send.Session.Rtc.SendFiles(send, files); }
@@ -252,12 +255,21 @@ namespace FindYou
                         await Control(send, "entry", new Dictionary<string, string> { { "id", remoteId }, { "path", file.Relative }, { "size", file.Size.ToString() }, { "isDir", file.IsDir ? "1" : "0" } });
                         if (file.IsDir) continue;
                         await Task.Run(() => Upload(send, file, remoteId, clock));
+                        long saveStart = Stopwatch.GetTimestamp();
                         await Control(send, "end-entry", new Dictionary<string, string> { { "id", remoteId } });
+                        send.SaveMs += (Stopwatch.GetTimestamp() - saveStart) * 1000 / Stopwatch.Frequency;
                     }
                     send.History.Status = "等待保存"; Refresh();
+                    long commitStart = Stopwatch.GetTimestamp();
                     await Control(send, "commit", new Dictionary<string, string> { { "id", remoteId } }); remoteId = null;
+                    send.SaveMs += (Stopwatch.GetTimestamp() - commitStart) * 1000 / Stopwatch.Frequency;
                 }
+                send.ElapsedMs = totalClock.ElapsedMilliseconds;
+                send.History.TransferRate = (long)(send.History.Size / Math.Max(.001, totalClock.Elapsed.TotalSeconds));
                 send.History.Progress = 100; send.History.Status = "已送达"; send.History.LocalPath = send.Source;
+                Log.W("传输统计 transport=" + (send.Session.Rtc != null ? "p2p" : send.Session.Streaming ? "http-stream" : "http-chunk")
+                    + " bytes=" + send.History.Size + " elapsedMs=" + send.ElapsedMs
+                    + " readMs=" + send.ReadTicks * 1000 / Stopwatch.Frequency + " writeMs=" + send.WriteTicks * 1000 / Stopwatch.Frequency + " saveMs=" + send.SaveMs);
             }
             catch (Exception ex)
             {
@@ -302,9 +314,14 @@ namespace FindYou
                         while (offset < file.Size)
                         {
                             send.Cancel.Token.ThrowIfCancellationRequested();
+                            long readStart = Stopwatch.GetTimestamp();
                             int count = input.Read(buffer, 0, (int)Math.Min(buffer.Length, file.Size - offset));
+                            send.ReadTicks += Stopwatch.GetTimestamp() - readStart;
                             if (count == 0) throw new IOException("源文件读取中断");
-                            output.Write(buffer, 0, count); offset += count; Progress(send, count, clock);
+                            long writeStart = Stopwatch.GetTimestamp();
+                            output.Write(buffer, 0, count);
+                            send.WriteTicks += Stopwatch.GetTimestamp() - writeStart;
+                            offset += count; Progress(send, count, clock);
                         }
                     }
                     using (var response = request.GetResponse()) using (var reader = new StreamReader(response.GetResponseStream())) NativeJson.Checked(reader.ReadToEnd());
@@ -333,8 +350,9 @@ namespace FindYou
         {
             var s = Session;
             return Json.D("ok", true, "connected", s != null && s.Connected, "session", s == null ? "" : s.Id, "peer", s == null ? "" : s.Peer.Id,
-                "status", s == null ? "" : s.Status, "transport", s == null ? "" : s.Rtc == null ? "http" : "p2p",
-                "sends", Sends.Select(x => (object)Json.D("id", x.History.Id, "name", x.History.Name, "progress", x.History.Progress, "status", x.History.Status, "rate", x.Rate)).ToArray());
+                "status", s == null ? "" : s.Status, "transport", s == null ? "" : s.Rtc == null ? "http" : "p2p", "streaming", s != null && s.Streaming,
+                "sends", Sends.Select(x => (object)Json.D("id", x.History.Id, "name", x.History.Name, "progress", x.History.Progress, "status", x.History.Status, "rate", x.Rate,
+                    "elapsedMs", x.ElapsedMs, "readMs", x.ReadTicks * 1000 / Stopwatch.Frequency, "writeMs", x.WriteTicks * 1000 / Stopwatch.Frequency, "saveMs", x.SaveMs)).ToArray());
         }
         public void Dispose()
         {

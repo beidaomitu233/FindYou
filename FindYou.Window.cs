@@ -272,6 +272,12 @@ namespace FindYou
                     var details = TextNode(item.Progress + "%" + (rate > 0 ? " · " + Bytes(rate) + "/s" : ""), 11, "#919B9F"); details.Margin = new Thickness(0, 6, 0, 0); status.Children.Add(details);
                     status.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100, Value = item.Progress, Height = 2, Margin = new Thickness(0, 7, 16, 0), Foreground = B(color), Background = B("#2A3034"), BorderThickness = new Thickness(0) });
                 }
+                else if (item.Progress == 100 && send != null && item.TransferRate > 0)
+                {
+                    status.Children.Add(TextNode("平均 " + Bytes(item.TransferRate) + "/s", 11, "#919B9F"));
+                    status.ToolTip = "总耗时 " + (send.ElapsedMs / 1000d).ToString("0.00") + " 秒" + (send.ReadTicks > 0 ? "\n读取等待 " + (send.ReadTicks / (double)Stopwatch.Frequency).ToString("0.00")
+                        + " 秒\n网络写入等待 " + (send.WriteTicks / (double)Stopwatch.Frequency).ToString("0.00") + " 秒\n对方保存确认 " + (send.SaveMs / 1000d).ToString("0.00") + " 秒" : "");
+                }
                 else if (history) status.Children.Add(TextNode(item.Time.ToString("MM-dd HH:mm"), 11, "#919B9F"));
                 Grid.SetColumn(status, 2); grid.Children.Add(status);
                 var commands = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(commands, 3); grid.Children.Add(commands);
