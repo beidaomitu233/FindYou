@@ -1,5 +1,7 @@
 # FindYou
 
+[下载 Windows 版本](https://github.com/beidaomitu233/FindYou/releases/latest) · [源码仓库](https://github.com/beidaomitu233/FindYou)
+
 FindYou 是面向 Windows 的双向文件互传工具。启动后自动发现设备，点击对方即可进入互传空间；双方都能直接拖入文件或文件夹，传输在后台继续完成。
 
 ## 使用流程
